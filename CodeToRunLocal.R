@@ -42,10 +42,6 @@ minCellCount <- 5
 
 achilles_schema <- "results"
 
-# Run the study code ----
-# source(here("RunStudy.R"))
-
-
 # create cdm object ------------------------------------------------------------
 cdm <- cdm_from_con(db, 
                     cdm_schema = cdmSchema, 
@@ -55,3 +51,8 @@ cdm <- cdm_from_con(db,
                     achilles_schema = achilles_schema
 )
 
+# Create log file
+resultsFolder <- here("Results")
+log_file <- paste0(resultsFolder, "/log.txt")
+logger <- create.logger(logfile = log_file, level = "INFO")
+info(logger = logger, "START RUN STUDY")
