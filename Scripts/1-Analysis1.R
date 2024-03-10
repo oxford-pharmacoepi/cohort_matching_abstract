@@ -1,57 +1,21 @@
-# Load required packages -------------------------------------------------------
-library(DBI)
-library(CDMConnector)
-library(log4r)
-library(here)
-library(readr)
-library(zip)
-library(RPostgres)
+info(logger, "START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT")
+tic(msg = "- Large scale characterisation of the cases")
 
-# Connect to database ----------------------------------------------------------
-# please see examples how to connect to the database here:
-# https://darwin-eu.github.io/CDMConnector/articles/a04_DBI_connection_examples.html
-server_dbi <- Sys.getenv("server_dbi")
-user       <- Sys.getenv("user")
-port       <- Sys.getenv("port")
-host       <- Sys.getenv("host")
+# Large scale characterization of the cases (conditions, drug_exposures) 
+info(logger, "- Large scale characteristics of the cases")
 
-#Connect to the database
-db <- dbConnect(RPostgres::Postgres(),
-                dbname = server_dbi,
-                port = port,
-                host = host,
-                user = user,
-                password = Sys.getenv("password"))
+lsc_analysis1 <- cdm[[denominator_cohort]] |>
+  summariseLargeScaleCharacteristics(
+    strata = list(),
+    window = list( c(-365, -31), c(-30,-1)),
+    eventInWindow   = "condition_occurrence",
+    episodeInWindow = NULL,
+    indexDate  = "cohort_start_date",
+    censorDate = NULL,
+    includeSource    = TRUE,
+    minimumFrequency = 0.005,
+    excludedCodes = NULL
+  )
 
-# parameters to connect to create cdm object ----
-# name of the schema where cdm tables are located
-cdmSchema <- "public_100k"
-
-# name of a schema in the database where you have writing permission
-writeSchema <- "results"
-
-# combination of at least 5 letters + _ (eg. "abcde_") that will lead any table
-# written in the write schema
-writePrefix <- "mah_hpv_"
-
-# name of the database, use acronym in capital letters (eg. "CPRD GOLD")
-dbName <- "CPRD GOLD"
-
-# minimum number of counts to be reported
-minCellCount <- 5
-
-achilles_schema <- "results"
-
-# Run the study code ----
-# source(here("RunStudy.R"))
-
-
-# create cdm object ------------------------------------------------------------
-cdm <- cdm_from_con(db, 
-                    cdm_schema = cdmSchema, 
-                    write_schema = c(schema = writeSchema, 
-                                     prefix = writePrefix),
-                    cdm_name = dbName,
-                    achilles_schema = achilles_schema
-)
-
+x <- toc(log = TRUE)
+info(logger, x$callback_msg)

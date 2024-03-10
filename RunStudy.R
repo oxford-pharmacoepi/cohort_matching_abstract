@@ -6,38 +6,42 @@ library("IncidencePrevalence")
 library("devtools")
 library("tictoc")
 library("tidyr")
+library("CDMConnector")
+library("flextable")
 
-denominator_concept_id <- list("headache" = 378253)
-denominator_cohort  <- "denominator"
-factor <- 100000
+# denominator_concept_id <- list("headache" = 378253)
+denominator_cohort  <- "hpv_cin23"
+factor <- 1 #100000/17267137
 
 # Create the denominator cohort
-cdm <- generateConceptCohortSet(cdm,
-                                conceptSet = denominator_concept_id,
-                                name       = denominator_cohort,
-                                overwrite  = TRUE) 
-cdm[[denominator_cohort]] <- cdm[[denominator_cohort]] |> newCohortTable()
+# cdm <- generateConceptCohortSet(cdm,
+#                                 conceptSet = denominator_concept_id,
+#                                 name       = denominator_cohort,
+#                                 overwrite  = TRUE) 
+# cdm[[denominator_cohort]] <- cdm[[denominator_cohort]] |> newCohortTable()
 
 # Large scale characterization -------------------------------------------------
 info(logger, "START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT")
 tic(msg = "- Large scale characterisation of the cases")
 
-# Large scale characterization of the cases (conditions, drug_exposures) 
+# Large scale characterization of the cases (conditions only) 
 info(logger, "- Large scale characteristics of the cases")
-largeScaleCharacteristics_analysis1 <- cdm[[denominator_cohort]] |>
+
+lsc_analysis1 <- cdm[[denominator_cohort]] |>
   summariseLargeScaleCharacteristics(
     strata = list(),
-    window = list(c(-Inf, -366), c(-365, -31), c(-30,-1)),
+    window = list( c(-365, -31), c(-30,-1)),
     eventInWindow   = "condition_occurrence",
     episodeInWindow = NULL,
     indexDate  = "cohort_start_date",
     censorDate = NULL,
-    includeSource    = TRUE,
+    includeSource    = FALSE,
     minimumFrequency = 0.005,
     excludedCodes = NULL
   )
-x <- toc(log = TRUE)
-info(logger, x$callback_msg)
+
+x1 <- toc(log = TRUE)
+info(logger, x1$callback_msg)
 
 # Calculate counts using achilles ----------------------------------------------
 info(logger, "START LARGE SCALE CHARACTERISATION USING ACHILLES")
@@ -45,32 +49,23 @@ tic(msg = "- Large scale characterisation using achilles")
 
 # Select concepts
 info(logger, "- Select conditions")
-concepts <- largeScaleCharacteristics_analysis1 |>
+concepts <- lsc_analysis1 |>
   # Concepts in largeScaleCharacterisation
   select("concept_name" = "variable_name", "additional_level") |>
   distinct() |>
   separate(additional_level, c("table_name", "type", "analysis", "concept_id"), sep = " and ") |>
   mutate(concept_id = as.numeric(concept_id)) |>
-  distinct() |>
-  inner_join(
+  left_join(
     # Counts of the conditions in Achilles tables
     cdm$achilles_results |>
       filter(analysis_id == 401) |>
-      select("concept_id" = "stratum_1","counts" = "count_value") |>
+      select("concept_id" = "stratum_1","stratum_2", "counts" = "count_value") |>
       mutate(concept_id = as.numeric(concept_id)),
     by = "concept_id",
     copy = TRUE
   ) |>
-  select("concept_name", "table_name", "concept_id", "counts")
-
-# Calculate estimates
-concepts |>
-  mutate(n_people      = 17216081,
-         n_denominator = cdm[[denominator_cohort]] |> tally() |> pull() |> as.numeric(),
-         factor        = factor) |>
-  mutate(estimate = counts/n_people*n_denominator/factor*100)
-
-
+  select("concept_name", "table_name", "concept_id", "counts") |>
+  mutate(counts = counts*factor)
 
 
 # Number of person-years in all the database
@@ -90,24 +85,31 @@ person_years <- cdm$observation_period %>%
             person_days  = sum(person_days),
             observation_period_start_date = min(observation_period_start_date),
             observation_period_end_date   = max(observation_period_end_date),
-            n_persons    = sum(person_number)) |>
+            n_people     = sum(person_number)) |>
   collect()
 
-# Calculate the uniform frequencies of the concepts
-info(logger, "- Calculate the uniform frequencies for each concept")
-counts |>
-  mutate(person_years = person_years$person_years) |>
-  mutate(cdm_name = "CPRD GOLD",
-         variable_level = "N/A",
-         estimate_name  = "incidence",
-         estimate_type  = "numeric",
-         estimate_value = count_value/person_years)
-  
-  
 
+# Calculate estimates and format table
+lsc_analysis2 <- concepts |>
+  mutate(n_people    = person_years$n_people,
+         n_phenotype = cdm[[denominator_cohort]] |> tally() |> pull() |> as.numeric(),
+         person_days = person_years$person_days,
+         n_condition = counts) |>
+  slice(rep(1:n(), each = 2)) |>
+  group_by(concept_name) |>
+  mutate(n = row_number()) |>
+  mutate(variable_level = if_else(n == 1, "-365 to -31", "-30 to -1"))  |>
+  mutate(estimate_name  = "percentage",
+         estimate_value = if_else(n == 1, 335*n_condition/person_days*100, 30*n_condition/person_days*100))
 
-# Calculate incidence using cohort-matching ------------------------------------
-#devtools::install_github("oxford-pharmacoepi/CohortConstructor")
+x2 <- toc(log = TRUE)
+info(logger, x2$callback_msg) 
+
+# Calculate percentage using cohort-matching ------------------------------------
+info(logger, "START MATCHING")
+tic(msg = "- Large scale characterisation using matched cohorts")
+
+#devtools::install_github("oxford-pharmacoepi/CohortConstructor", force = TRUE)
 library("CohortConstructor")
 cdm <- cdm |>
   generateMatchedCohortSet(
@@ -123,32 +125,98 @@ cdm$matched <- cdm$matched |>
   mutate(subject_id = as.numeric(subject_id),
          cohort_end_date = as.Date(cohort_end_date))
 
-analysis_table_3 <- estimateIncidence(
-  cdm,
-  denominatorTable = "matched",
-  outcomeTable     = outcome_cohort,
-  denominatorCohortId = NULL,
-  outcomeCohortId     = NULL,
-  interval = "overall",
-  completeDatabaseIntervals = FALSE,
-  outcomeWashout = Inf,
-  repeatedEvents = FALSE,
-  minCellCount   = 5,
-  strata = list(),
-  includeOverallStrata = TRUE,
-  returnParticipants = FALSE
-) |>
-  select("analysis_id","n_persons","person_days","n_events","incidence_start_date",
-         "incidence_end_date","person_years","incidence_100000_pys","incidence_100000_pys_95CI_lower",
-         "incidence_100000_pys_95CI_upper") |>
-  mutate(analysis_id = "3")
-
-# Overall result ---------------------------------------------------------------
-analysis_table_1 |>
-  union_all(
-    analysis_table_2
-  ) |>
-  union_all(
-    analysis_table_3
+lsc_analysis3 <- cdm[["matched"]] |>
+  summariseLargeScaleCharacteristics(
+    strata = list(c("cohort_definition_id")),
+    window = list(c(-365, -31), c(-30,-1)),
+    eventInWindow   = "condition_occurrence",
+    episodeInWindow = NULL,
+    indexDate  = "cohort_start_date",
+    censorDate = NULL,
+    includeSource    = FALSE,
+    minimumFrequency = 0.005,
+    excludedCodes = NULL
   )
+
+x3 <- toc(log = TRUE)
+info(logger, x3$callback_msg)
+
+
+# Compute tables ---------------------------------------------------------------
+a1 <- lsc_analysis1 |>
+  filter(estimate_name == "percentage") |>
+  select("variable_name", "variable_level","Original cohort (%)" = "estimate_value")
+  
+a2 <- lsc_analysis2 |>
+  select("variable_name" = "concept_name", "variable_level","Achilles approximation (%)" = "estimate_value")
+
+a3 <-  lsc_analysis3 |>
+  filter(estimate_name == "percentage",
+         strata_level  != "overall") |>
+  select("variable_name", "variable_level","strata_level","estimate_value") |>
+   mutate(strata_level = if_else(strata_level == 1, "Cohort (%)", "Cohort matched (%)")) |>
+   pivot_wider(id_cols = c("variable_name","variable_level"),
+               names_from  = "strata_level",
+               values_from = "estimate_value")
+    
+tab <- a1 |>
+  full_join(a2) |>
+  full_join(a3) |>
+  arrange(desc(`Original cohort (%)`)) |>
+  group_by(variable_name) |>
+  mutate(n = row_number()) |>
+  mutate(n = if_else(n > 1, 0,n)) |>
+  ungroup() |>
+  mutate(n = cumsum(n)) |>
+  group_by(variable_name) |>
+  mutate(n = min(n)) |>
+  arrange(n,variable_name,variable_level) |>
+  select(-n) |>
+  mutate(`Original cohort (%)` = round(as.numeric(`Original cohort (%)`),2),
+         `Achilles approximation (%)` = round(as.numeric(`Achilles approximation (%)`),2),
+         `Cohort (%)` = round(as.numeric(`Cohort (%)`),2),
+         `Cohort matched (%)` = round(as.numeric(`Cohort matched (%)`),2))
+  
+tab <- rbind(tibble("variable_name"  = "Computational time",
+                    "variable_level" = " ",
+                    `Original cohort (%)` = gsub(" elap.*","",gsub(".*: ","",x1$callback_msg)),
+                    `Achilles approximation (%)` = gsub(" elap.*","",gsub(".*: ","",x2$callback_msg)),
+                    `Cohort (%)`          = gsub(" elap.*","",gsub(".*: ","",x3$callback_msg)),
+                    `Cohort matched (%)`  = " "), 
+             tab) |>
+  rename("Conditions" = "variable_name") |>
+  rename("Windows"    = "variable_level")
+
+vec <- tab |>
+  group_by(Conditions) |>
+  mutate(n = row_number()) |> 
+  mutate(n_max = max(n)) |>
+  mutate(n = if_else(n == max(n), n, 0)) |> 
+  ungroup() |>
+  mutate(n = cumsum(n)) |>
+  select(n) |>
+  distinct() |>
+  filter(n != 0) |>
+  pull(n)
+
+
+tab |>
+  flextable() |>
+  align(j = c(3,4,5,6), align = "center", part = "all") |>
+  bold(i = 1, bold = TRUE, part = "header") |>
+  hline(i = c(vec), part = "body") |>
+  merge_at(i = 1, j = c(1,2), part = "body") |>
+  merge_at(i = 1, j = c(5,6), part = "body") |>
+  width(j = 1, width = 8, unit = "cm") |>
+  width(j = 2, width = 3, unit = "cm") |>
+  merge_v(j = ~Conditions) 
+  
+  
+  
+                
+
+
+
+
+
 
