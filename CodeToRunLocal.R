@@ -23,7 +23,7 @@ db <- dbConnect(RPostgres::Postgres(),
                 user = user,
                 password = Sys.getenv("password"))
 
-# parameters to connect to create cdm object ----
+
 # name of the schema where cdm tables are located
 cdmSchema <- "public"
 
@@ -42,14 +42,13 @@ minCellCount <- 5
 
 achilles_schema <- "results"
 
-# create cdm object ------------------------------------------------------------
+# Create cdm object ------------------------------------------------------------
 cdm <- cdm_from_con(db, 
                     cdm_schema = cdmSchema, 
                     write_schema = c(schema = writeSchema, 
                                      prefix = writePrefix),
                     cdm_name = dbName,
-                    achilles_schema = achilles_schema,
-                    cohort_tables = "hpv_cin23"
+                    achilles_schema = achilles_schema, cohort_tables = "hpv_cin23"
 )
 
 # Create log file
@@ -57,4 +56,14 @@ resultsFolder <- here("Results")
 log_file <- paste0(resultsFolder, "/log.txt")
 logger <- create.logger(logfile = log_file, level = "INFO")
 info(logger = logger, "START RUN STUDY")
+
+
+# Instantiate cohort -----------------------------------------------------------
+covariates <- readCohortSet(here("Cohorts"))
+cdm <- generateCohortSet(
+  cdm = cdm,
+  cohortSet = covariates,
+  overwrite = TRUE,
+  name = "hpv_cin23"
+)
 

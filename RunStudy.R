@@ -9,6 +9,8 @@ library("tidyr")
 library("CDMConnector")
 library("flextable")
 
+source(here("Scripts/Functions.R"))
+
 # denominator_concept_id <- list("headache" = 378253)
 denominator_cohort  <- "hpv_cin23"
 factor <- 1 #100000/17267137
@@ -112,7 +114,7 @@ tic(msg = "- Large scale characterisation using matched cohorts")
 #devtools::install_github("oxford-pharmacoepi/CohortConstructor", force = TRUE)
 library("CohortConstructor")
 cdm <- cdm |>
-  generateMatchedCohortSet(
+  generateMatchedCohortSet_mah(
   name = "matched",
   targetCohortName = denominator_cohort,
   targetCohortId   = NULL,

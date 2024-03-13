@@ -1,3 +1,73 @@
 INFO  [2024-03-10 22:02:10] START RUN STUDY
 INFO  [2024-03-10 22:02:17] START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT
 INFO  [2024-03-10 22:02:17] - Large scale characteristics of the cases
+INFO  [2024-03-10 22:19:22] START RUN STUDY
+INFO  [2024-03-10 22:19:22] START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT
+INFO  [2024-03-10 22:19:22] - Large scale characteristics of the cases
+INFO  [2024-03-11 09:20:50] START RUN STUDY
+INFO  [2024-03-11 09:21:03] START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT
+INFO  [2024-03-11 09:21:04] - Large scale characteristics of the cases
+INFO  [2024-03-11 09:21:05] - Large scale characterisation of the cases: 1.12 sec elapsed
+INFO  [2024-03-11 09:23:44] START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT
+INFO  [2024-03-11 09:23:45] - Large scale characteristics of the cases
+INFO  [2024-03-11 09:26:17] START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT
+INFO  [2024-03-11 09:26:18] - Large scale characteristics of the cases
+INFO  [2024-03-11 09:37:18] START RUN STUDY
+INFO  [2024-03-11 09:37:39] START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT
+INFO  [2024-03-11 09:37:39] - Large scale characteristics of the cases
+INFO  [2024-03-11 09:37:45] - Large scale characterisation of the cases: 6.67 sec elapsed
+INFO  [2024-03-11 09:41:49] START RUN STUDY
+INFO  [2024-03-11 09:42:43] START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT
+INFO  [2024-03-11 09:42:43] - Large scale characteristics of the cases
+INFO  [2024-03-11 09:56:27] - Large scale characterisation of the cases: 823.58 sec elapsed
+INFO  [2024-03-11 09:56:27] START LARGE SCALE CHARACTERISATION USING ACHILLES
+INFO  [2024-03-11 09:56:27] - Select conditions
+INFO  [2024-03-11 09:56:38] - Calculate person-years
+INFO  [2024-03-11 09:58:18] - Large scale characterisation using achilles: 111.18 sec elapsed
+INFO  [2024-03-11 09:58:18] START MATCHING
+INFO  [2024-03-11 19:59:40] START RUN STUDY
+INFO  [2024-03-11 19:59:42] START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT
+INFO  [2024-03-11 19:59:42] - Large scale characteristics of the cases
+INFO  [2024-03-11 20:17:24] - Large scale characterisation of the cases: 1061.42 sec elapsed
+INFO  [2024-03-11 20:17:24] START LARGE SCALE CHARACTERISATION USING ACHILLES
+INFO  [2024-03-11 20:17:24] - Select conditions
+INFO  [2024-03-11 20:17:37] - Calculate person-years
+INFO  [2024-03-11 20:18:17] - Large scale characterisation using achilles: 53.25 sec elapsed
+INFO  [2024-03-11 20:18:17] START MATCHING
+INFO  [2024-03-12 12:12:08] START RUN STUDY
+INFO  [2024-03-12 12:14:35] START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT
+INFO  [2024-03-12 12:14:35] - Large scale characteristics of the cases
+INFO  [2024-03-12 12:14:43] - Large scale characterisation of the cases: 7.84 sec elapsed
+INFO  [2024-03-12 12:14:43] START LARGE SCALE CHARACTERISATION USING ACHILLES
+INFO  [2024-03-12 12:14:43] - Select conditions
+INFO  [2024-03-12 12:14:48] - Calculate person-years
+INFO  [2024-03-12 12:14:50] - Large scale characterisation using achilles: 6.85 sec elapsed
+INFO  [2024-03-12 12:14:50] START MATCHING
+INFO  [2024-03-12 12:15:42] - Large scale characterisation using matched cohorts: 51.69 sec elapsed
+INFO  [2024-03-12 12:17:11] START RUN STUDY
+INFO  [2024-03-12 15:36:07] START RUN STUDY
+INFO  [2024-03-12 15:43:32] START RUN STUDY
+INFO  [2024-03-12 17:17:39] START RUN STUDY
+INFO  [2024-03-12 17:18:10] START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT
+INFO  [2024-03-12 17:18:10] - Large scale characteristics of the cases
+INFO  [2024-03-12 17:18:18] - Large scale characterisation of the cases: 8.34 sec elapsed
+INFO  [2024-03-12 17:18:18] START LARGE SCALE CHARACTERISATION USING ACHILLES
+INFO  [2024-03-12 17:18:18] - Select conditions
+INFO  [2024-03-12 17:18:22] - Calculate person-years
+INFO  [2024-03-12 17:18:23] - Large scale characterisation using achilles: 5.22 sec elapsed
+INFO  [2024-03-12 17:18:23] START MATCHING
+INFO  [2024-03-12 17:18:57] - Large scale characterisation using matched cohorts: 33.96 sec elapsed
+INFO  [2024-03-12 17:51:30] START RUN STUDY
+INFO  [2024-03-13 09:39:52] START RUN STUDY
+INFO  [2024-03-13 09:40:09] START RUN STUDY
+INFO  [2024-03-13 09:42:33] START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT
+INFO  [2024-03-13 09:42:33] - Large scale characteristics of the cases
+INFO  [2024-03-13 09:42:40] - Large scale characterisation of the cases: 7.04 sec elapsed
+INFO  [2024-03-13 09:42:40] START LARGE SCALE CHARACTERISATION USING ACHILLES
+INFO  [2024-03-13 09:42:40] - Select conditions
+INFO  [2024-03-13 09:42:45] - Calculate person-years
+INFO  [2024-03-13 09:42:47] - Large scale characterisation using achilles: 7.39 sec elapsed
+INFO  [2024-03-13 09:42:47] START MATCHING
+INFO  [2024-03-13 09:43:37] - Large scale characterisation using matched cohorts: 49.8 sec elapsed
+INFO  [2024-03-13 13:10:56] START RUN STUDY
+INFO  [2024-03-13 13:27:59] START RUN STUDY

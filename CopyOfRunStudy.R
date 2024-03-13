@@ -22,10 +22,10 @@ factor <- 100000/17267137
 
 # Large scale characterization -------------------------------------------------
 info(logger, "START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT")
-tic(msg = "- Large scale characterisation of the cohort")
+tic(msg = "- Large scale characterisation of the cases")
 
 # Large scale characterization of the cases (conditions only) 
-info(logger, "- Large scale characteristics of the cohort")
+info(logger, "- Large scale characteristics of the cases")
 
 lsc_analysis1 <- cdm[[denominator_cohort]] |>
   summariseLargeScaleCharacteristics(
@@ -113,13 +113,13 @@ tic(msg = "- Large scale characterisation using matched cohorts")
 library("CohortConstructor")
 cdm <- cdm |>
   generateMatchedCohortSet(
-    name = "matched",
-    targetCohortName = denominator_cohort,
-    targetCohortId   = NULL,
-    matchSex = TRUE,
-    matchYearOfBirth = TRUE,
-    ratio = 1
-  )
+  name = "matched",
+  targetCohortName = denominator_cohort,
+  targetCohortId   = NULL,
+  matchSex = TRUE,
+  matchYearOfBirth = TRUE,
+  ratio = 1
+)
 
 cdm$matched <- cdm$matched |>
   mutate(subject_id = as.numeric(subject_id),
@@ -146,7 +146,7 @@ info(logger, x3$callback_msg)
 a1 <- lsc_analysis1 |>
   filter(estimate_name == "percentage") |>
   select("variable_name", "variable_level","Original cohort (%)" = "estimate_value")
-
+  
 a2 <- lsc_analysis2 |>
   select("variable_name" = "concept_name", "variable_level","Achilles approximation (%)" = "estimate_value")
 
@@ -154,10 +154,18 @@ a3 <-  lsc_analysis3 |>
   filter(estimate_name == "percentage",
          strata_level  != "overall") |>
   select("variable_name", "variable_level","strata_level","estimate_value") |>
-  mutate(strata_level = if_else(strata_level == 1, "Cohort (%)", "Cohort matched (%)")) |>
-  pivot_wider(id_cols = c("variable_name","variable_level"),
-              names_from  = "strata_level",
-              values_from = "estimate_value")
+   mutate(strata_level = if_else(strata_level == 1, "Cohort (%)", "Cohort matched (%)")) |>
+   pivot_wider(id_cols = c("variable_name","variable_level"),
+               names_from  = "strata_level",
+               values_from = "estimate_value")
+
+# Calculate smd
+x <- lsc_analysis3 |>
+  filter(estimate_name == "percentage") 
+cohorts <- x |>
+  select("group_level", "strata_name", "strata_level") |>
+  distinct() |>
+  filter(strata_name != "overall")
 
 tab <- a1 |>
   full_join(a2) |>
@@ -176,7 +184,7 @@ tab <- a1 |>
          `Achilles approximation (%)` = round(as.numeric(`Achilles approximation (%)`),2),
          `Cohort (%)` = round(as.numeric(`Cohort (%)`),2),
          `Cohort matched (%)` = round(as.numeric(`Cohort matched (%)`),2))
-
+  
 tab <- rbind(tibble("variable_name"  = "Computational time",
                     "variable_level" = " ",
                     `Original cohort (%)` = gsub(" elap.*","",gsub(".*: ","",x1$callback_msg)),
@@ -210,10 +218,10 @@ tab |>
   width(j = 1, width = 8, unit = "cm") |>
   width(j = 2, width = 3, unit = "cm") |>
   merge_v(j = ~Conditions) 
-
-
-
-
+  
+  
+  
+                
 
 
 
