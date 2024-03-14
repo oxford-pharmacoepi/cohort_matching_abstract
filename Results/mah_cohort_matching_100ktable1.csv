@@ -1,0 +1,11 @@
+"","Original cohort_Condition","Original cohort_Window","Original cohort_Percentage (%)"
+"1","Blood pressure finding","-365 to -31",53.6
+"2","No matching concept","-365 to -31",24.77
+"3","Cervical smear - severe dyskaryosis","-365 to -31",18.92
+"4","Cervical smear - borderline changes","-365 to -31",16.67
+"5","Cervical smear - mild dyskaryosis","-365 to -31",16.22
+"6","Cervical smear - moderate dyskaryosis","-365 to -31",15.32
+"7","Patient self-report","-365 to -31",9.91
+"8","Exercise grading","-365 to -31",9.01
+"9","No matching concept","-30 to -1",8.56
+"10","Blood pressure finding","-30 to -1",7.21
