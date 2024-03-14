@@ -8,17 +8,11 @@ library("tictoc")
 library("tidyr")
 library("CDMConnector")
 library("flextable")
+source(here("Scripts/Functions.R"))
 
 # denominator_concept_id <- list("headache" = 378253)
 denominator_cohort  <- "hpv_cin23"
 factor <- 100000/17267137
-
-# Create the denominator cohort
-# cdm <- generateConceptCohortSet(cdm,
-#                                 conceptSet = denominator_concept_id,
-#                                 name       = denominator_cohort,
-#                                 overwrite  = TRUE) 
-# cdm[[denominator_cohort]] <- cdm[[denominator_cohort]] |> newCohortTable()
 
 # Large scale characterization -------------------------------------------------
 info(logger, "START LARGE SCALE CHARACTERISATION - ORIGINAL COHORT")
@@ -51,9 +45,9 @@ tic(msg = "- Large scale characterisation using achilles")
 info(logger, "- Select conditions")
 concepts <- lsc_analysis1 |>
   # Concepts in largeScaleCharacterisation
-  select("concept_name" = "variable_name", "additional_level") |>
+  select("variable_name", "additional_level") |>
   distinct() |>
-  separate(additional_level, c("table_name", "type", "analysis", "concept_id"), sep = " and ") |>
+  separate(additional_level, c("table_name", "type", "analysis", "concept_id"), sep = " &&& ") |>
   mutate(concept_id = as.numeric(concept_id)) |>
   left_join(
     # Counts of the conditions in Achilles tables
@@ -64,9 +58,8 @@ concepts <- lsc_analysis1 |>
     by = "concept_id",
     copy = TRUE
   ) |>
-  select("concept_name", "table_name", "concept_id", "counts") |>
+  select("variable_name", "table_name", "concept_id", "counts") |>
   mutate(counts = counts*factor)
-
 
 # Number of person-years in all the database
 info(logger, "- Calculate person-years")
@@ -96,11 +89,12 @@ lsc_analysis2 <- concepts |>
          person_days = person_years$person_days,
          n_condition = counts) |>
   slice(rep(1:n(), each = 2)) |>
-  group_by(concept_name) |>
+  group_by(variable_name) |>
   mutate(n = row_number()) |>
   mutate(variable_level = if_else(n == 1, "-365 to -31", "-30 to -1"))  |>
   mutate(estimate_name  = "percentage",
-         estimate_value = if_else(n == 1, 335*n_condition/person_days*100, 30*n_condition/person_days*100))
+         estimate_value = if_else(n == 1, 335*n_condition/person_days*100, 30*n_condition/person_days*100),
+         group_level = paste0(denominator_cohort, "_achilles"))
 
 x2 <- toc(log = TRUE)
 info(logger, x2$callback_msg) 
@@ -111,19 +105,68 @@ tic(msg = "- Large scale characterisation using matched cohorts")
 
 #devtools::install_github("oxford-pharmacoepi/CohortConstructor", force = TRUE)
 library("CohortConstructor")
-cdm <- cdm |>
-  generateMatchedCohortSet(
-  name = "matched",
-  targetCohortName = denominator_cohort,
-  targetCohortId   = NULL,
-  matchSex = TRUE,
-  matchYearOfBirth = TRUE,
-  ratio = 1
-)
+# Alternative matching
+cdm[["matched_alternative"]] <- cdm[[denominator_cohort]] |>
+  # Add sex and year of birth
+  inner_join(
+    cdm[["person"]] |>
+      select("subject_id" = "person_id", "gender_concept_id", "year_of_birth"),
+    by = "subject_id"
+  ) |>
+  rename("subject_id_reference" = subject_id) |>
+  # Matching
+  inner_join(
+    # Remove people that is in the cohort
+    cdm[["person"]] |>
+      anti_join(
+        cdm[[denominator_cohort]] |>
+          select("person_id" = "subject_id"),
+        by = "person_id"
+      ) |>
+      select("subject_id_comparator" = "person_id", "gender_concept_id", "year_of_birth"),
+    by = c("gender_concept_id", "year_of_birth")
+  ) |>
+  group_by(subject_id_reference) |> 
+  filter(row_number() == 1) |> 
+  ungroup() |>
+  group_by(subject_id_comparator) |>
+  filter(row_number() == 1) |> 
+  ungroup() |>
+  group_by(subject_id_comparator, subject_id_reference) |>
+  filter(row_number() == 1) |> 
+  ungroup() |>
+  compute(name = "matched_alternative", temporary = FALSE)
 
-cdm$matched <- cdm$matched |>
-  mutate(subject_id = as.numeric(subject_id),
-         cohort_end_date = as.Date(cohort_end_date))
+cdm[["matched_alternative"]] <- cdm[["matched_alternative"]] |>
+  rename("subject_id" = "subject_id_comparator") |>
+  addFutureObservation() |> 
+  filter(!is.na(future_observation)) |>
+  rename("subject_id_comparator" = "subject_id") |>
+  compute(name = "matched_alternative", temporary = FALSE)
+  
+cdm[["matched_alternative"]] <- cdm[["matched_alternative"]] |>
+  select("cohort_definition_id", "subject_id" = "subject_id_reference", "cohort_start_date", "cohort_end_date") |>
+  full_join(
+    cdm[["matched_alternative"]] |>
+      select("cohort_definition_id", "subject_id" = "subject_id_comparator", "cohort_start_date", "cohort_end_date") |>
+      mutate("cohort_definition_id" = 2)
+  ) |>
+  compute(name = "matched_alternative", temporary = FALSE)
+
+# Original matching:
+# cdm <- cdm |>
+#   generateMatchedCohortSet(
+#   name = "matched",
+#   targetCohortName = denominator_cohort,
+#   targetCohortId   = NULL,
+#   matchSex = TRUE,
+#   matchYearOfBirth = TRUE,
+#   ratio = 1
+# )
+
+# cdm$matched <- cdm$matched |>
+#   mutate(subject_id = as.numeric(subject_id),
+#          cohort_end_date = as.Date(cohort_end_date))
 
 lsc_analysis3 <- cdm[["matched"]] |>
   summariseLargeScaleCharacteristics(
@@ -141,25 +184,42 @@ lsc_analysis3 <- cdm[["matched"]] |>
 x3 <- toc(log = TRUE)
 info(logger, x3$callback_msg)
 
+# Export tables ----------------------------------------------------------------
+write.csv(lsc_analysis1, here("Results",paste0(writePrefix,"lsc_analysis1.csv")))
+write.csv(lsc_analysis2, here("Results",paste0(writePrefix,"lsc_analysis2.csv")))
+write.csv(lsc_analysis3, here("Results",paste0(writePrefix,"lsc_analysis3.csv")))
 
-# Compute tables ---------------------------------------------------------------
-a1 <- lsc_analysis1 |>
+# Calculate standarised mean differences ---------------------------------------
+# Calculate asmd between cohort and achilles
+c1 <- lsc_analysis1 |>
   filter(estimate_name == "percentage") |>
-  select("variable_name", "variable_level","Original cohort (%)" = "estimate_value")
-  
-a2 <- lsc_analysis2 |>
-  select("variable_name" = "concept_name", "variable_level","Achilles approximation (%)" = "estimate_value")
+  select(
+    "group_level_reference" = "group_level",  
+    "variable_name","variable_level",
+    "estimate_value_reference" = "estimate_value"
+  ) |>
+  mutate("pi" = estimate_value_reference) |>
+  inner_join(
+    lsc_analysis2 |> 
+      select(
+        "group_level_comparator" = "group_level",
+        "variable_name", "variable_level",
+        "estimate_value_comparator" = "estimate_value",
+      ) |>
+      mutate("pk" = estimate_value_comparator),
+    by = c("variable_name", "variable_level")
+  ) |>
+  mutate(pk = if_else(is.na(pk), 0, as.numeric(pk)/100)) |>
+  mutate(pi = if_else(is.na(pi), 0, as.numeric(pi)/100)) |>
+  mutate(
+    "smd" = as.character((pk - pi) / sqrt((pk*(1-pk) + pi*(1-pi))/2)),
+    "strata_name_reference" = cohorts$group_level[1],
+    "strata_name_comparator" = cohorts$group_level[2]
+  ) |>
+  select(-c("pi", "pk"))
 
-a3 <-  lsc_analysis3 |>
-  filter(estimate_name == "percentage",
-         strata_level  != "overall") |>
-  select("variable_name", "variable_level","strata_level","estimate_value") |>
-   mutate(strata_level = if_else(strata_level == 1, "Cohort (%)", "Cohort matched (%)")) |>
-   pivot_wider(id_cols = c("variable_name","variable_level"),
-               names_from  = "strata_level",
-               values_from = "estimate_value")
 
-# Calculate smd
+# Calculate asmd between matched cohorts
 x <- lsc_analysis3 |>
   filter(estimate_name == "percentage") 
 cohorts <- x |>
@@ -167,64 +227,87 @@ cohorts <- x |>
   distinct() |>
   filter(strata_name != "overall")
 
-tab <- a1 |>
-  full_join(a2) |>
-  full_join(a3) |>
-  arrange(desc(`Original cohort (%)`)) |>
-  group_by(variable_name) |>
-  mutate(n = row_number()) |>
-  mutate(n = if_else(n > 1, 0,n)) |>
-  ungroup() |>
-  mutate(n = cumsum(n)) |>
-  group_by(variable_name) |>
-  mutate(n = min(n)) |>
-  arrange(n,variable_name,variable_level) |>
-  select(-n) |>
-  mutate(`Original cohort (%)` = round(as.numeric(`Original cohort (%)`),2),
-         `Achilles approximation (%)` = round(as.numeric(`Achilles approximation (%)`),2),
-         `Cohort (%)` = round(as.numeric(`Cohort (%)`),2),
-         `Cohort matched (%)` = round(as.numeric(`Cohort matched (%)`),2))
+xi <- x |> 
+  filter(group_level == cohorts$group_level[1], strata_name != "overall")
+xk <- x |>
+  filter(group_level == cohorts$group_level[2], strata_name != "overall")
+
+c2 <- xi |>
+  filter(strata_level == 1, estimate_type == "percentage") |>
+  select(
+    "group_level_reference" = "group_level", 
+    "strata_level_reference" = "strata_level", "variable_name", 
+    "estimate_value_reference" = "estimate_value", "variable_level", "additional_name", 
+    "additional_level"
+  ) |>
+  mutate("pi" = estimate_value_reference) |>
+  inner_join(
+    xk |> 
+      select(
+        "group_level_comparator" = "group_level",
+        "strata_level_comparator" = "strata_level", "variable_name", 
+        "estimate_value_comparator" = "estimate_value", "variable_level", "additional_name", 
+        "additional_level"
+      ) |>
+      mutate("pk" = estimate_value_comparator),
+    by = c("variable_name", "variable_level", "additional_name", "additional_level")
+  ) |>
+  mutate(pk = if_else(is.na(pk), 0, as.numeric(pk)/100)) |>
+  mutate(pi = if_else(is.na(pi), 0, as.numeric(pi)/100)) |>
+  mutate(
+    "smd" = as.character((pk - pi) / sqrt((pk*(1-pk) + pi*(1-pi))/2)),
+    "strata_name_reference" = cohorts$group_level[1],
+    "strata_name_comparator" = cohorts$group_level[2]
+  ) |>
+  select(-c("pi", "pk"))
+
+# Compute tables ---------------------------------------------------------------
+# Top 5 lookig at the % in the original cohort
+table1 <- lsc_analysis1 |>
+  filter(estimate_type == "percentage") |>
+  mutate(estimate_value = as.numeric(estimate_value)) |>
+  select("variable_name", "variable_level", "estimate_value") |>
+  arrange(desc(estimate_value)) |>
+  filter(row_number() < 11)
+
+table2 <- c1 |>
+  select("variable_name", "variable_level", "estimate_value_reference", 
+         "estimate_value_comparator", "smd") |>
+  mutate(asmd = abs(as.numeric(smd))) |>
+  arrange(desc(asmd)) |>
+  filter(row_number() < 11) |>
+  select(-"smd")
+
+table3 <- c2 |>
+  select("variable_name", "variable_level", "estimate_value_reference", 
+         "estimate_value_comparator", "smd") |>
+  mutate(asmd = abs(as.numeric(smd))) |>
+  arrange(desc(asmd)) |>
+  filter(row_number() < 11) |>
+  select(-"smd")
+
+# Compare tables ---------------------------------------------------------------
+t1 <- table1 |>
+  rename("Condition" = "variable_name", "Window" = "variable_level", "Percentage (%)" = "estimate_value") |>
+  rename_all(.funs = ~paste0("Original cohort_",.))
   
-tab <- rbind(tibble("variable_name"  = "Computational time",
-                    "variable_level" = " ",
-                    `Original cohort (%)` = gsub(" elap.*","",gsub(".*: ","",x1$callback_msg)),
-                    `Achilles approximation (%)` = gsub(" elap.*","",gsub(".*: ","",x2$callback_msg)),
-                    `Cohort (%)`          = gsub(" elap.*","",gsub(".*: ","",x3$callback_msg)),
-                    `Cohort matched (%)`  = " "), 
-             tab) |>
-  rename("Conditions" = "variable_name") |>
-  rename("Windows"    = "variable_level")
+t2 <- table2 |>
+  rename("Condition" = "variable_name", "Window" = "variable_level", 
+         "Percentage (%)_Original cohort" = "estimate_value_reference",
+         "Percentage (%)_Achilles"        = "estimate_value_comparator",
+         "ASMD" = "asmd") |>
+  rename_all(.funs = ~paste0("Achilles table comparison_",.))
 
-vec <- tab |>
-  group_by(Conditions) |>
-  mutate(n = row_number()) |> 
-  mutate(n_max = max(n)) |>
-  mutate(n = if_else(n == max(n), n, 0)) |> 
-  ungroup() |>
-  mutate(n = cumsum(n)) |>
-  select(n) |>
-  distinct() |>
-  filter(n != 0) |>
-  pull(n)
+t3 <- table3 |>
+  rename("Condition" = "variable_name", "Window" = "variable_level", 
+         "Percentage (%)_Original cohort" = "estimate_value_reference",
+         "Percentage (%)_Matched cohort"  = "estimate_value_comparator",
+         "ASMD" = "asmd") |>
+  rename_all(.funs = ~paste0("Matched cohorts comparison_",.))
 
-
-tab |>
-  flextable() |>
-  align(j = c(3,4,5,6), align = "center", part = "all") |>
-  bold(i = 1, bold = TRUE, part = "header") |>
-  hline(i = c(vec), part = "body") |>
-  merge_at(i = 1, j = c(1,2), part = "body") |>
-  merge_at(i = 1, j = c(5,6), part = "body") |>
-  width(j = 1, width = 8, unit = "cm") |>
-  width(j = 2, width = 3, unit = "cm") |>
-  merge_v(j = ~Conditions) 
-  
-  
-  
-                
-
-
-
-
+# Export comparison tables -----------------------------------------------------
+write.csv(t1, here("Results",paste0(writePrefix,"table1.csv")))
+write.csv(t2, here("Results",paste0(writePrefix,"table2.csv")))
+write.csv(t3, here("Results",paste0(writePrefix,"table3.csv")))
 
 
